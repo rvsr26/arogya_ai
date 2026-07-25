@@ -12,6 +12,11 @@ import { Injectable, ConfigService, } from '@nitrostack/core';
 import { DoctorModel } from './schemas/doctor.schema.js';
 import { SlotModel } from './schemas/slot.schema.js';
 import { AppointmentModel } from './schemas/appointment.schema.js';
+import { ReminderModel } from './schemas/reminder.schema.js';
+import { PatientPreferenceModel } from './schemas/patient-preference.schema.js';
+import { BedModel } from './schemas/bed.schema.js';
+import { MedicineModel } from './schemas/medicine.schema.js';
+import { LabTestModel } from './schemas/lab-test.schema.js';
 import { SEED_DOCTORS, buildSeedSlots } from './seed-data.js';
 /**
  * Owns the single Mongoose connection for the whole MCP server and guarantees
@@ -129,6 +134,31 @@ let DatabaseService = class DatabaseService {
     async appointments() {
         await this.connect();
         return AppointmentModel;
+    }
+    /** Reminders collection */
+    async reminders() {
+        await this.connect();
+        return ReminderModel;
+    }
+    /** Patient preferences collection */
+    async patientPreferences() {
+        await this.connect();
+        return PatientPreferenceModel;
+    }
+    /** Beds collection */
+    async beds() {
+        await this.connect();
+        return BedModel;
+    }
+    /** Medicines collection */
+    async medicines() {
+        await this.connect();
+        return MedicineModel;
+    }
+    /** Lab tests collection */
+    async labTests() {
+        await this.connect();
+        return LabTestModel;
     }
 };
 DatabaseService = __decorate([

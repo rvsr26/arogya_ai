@@ -94,29 +94,46 @@ let AppointmentsTools = class AppointmentsTools {
                 return {
                     booked: false,
                     bookingId: null,
-                    error: error.message,
+                    error: true,
+                    message: error.message,
                     summary: `Could not book that slot: ${error.message}`,
                 };
             }
-            throw error;
+            ctx.logger.error('book-appointment failed', { error: error.message });
+            return {
+                booked: false,
+                bookingId: null,
+                error: true,
+                message: `Booking failed: ${error.message}`,
+                summary: `Could not book that slot due to a system error.`,
+            };
         }
     }
     async getAppointment(input, ctx) {
         ctx.logger.info('get-appointment', { bookingId: input.bookingId });
-        const booking = await this.appointments.getAppointment(input.bookingId);
-        if (!booking) {
+        try {
+            const booking = await this.appointments.getAppointment(input.bookingId);
+            if (!booking) {
+                ctx.logger.warn?.('get-appointment not found', { bookingId: input.bookingId });
+                return {
+                    found: false,
+                    bookingId: input.bookingId,
+                    error: true,
+                    message: `No appointment found with bookingId "${input.bookingId}".`,
+                    summary: `No appointment found with bookingId "${input.bookingId}". Book one with book-appointment first.`,
+                };
+            }
+            ctx.logger.info('get-appointment success', { bookingId: input.bookingId, status: booking.status });
             return {
-                found: false,
-                bookingId: input.bookingId,
-                error: `No appointment found with bookingId "${input.bookingId}".`,
-                summary: `No appointment found with bookingId "${input.bookingId}". Book one with book-appointment first.`,
+                found: true,
+                ...booking,
+                summary: `Booking ${booking.bookingId} is ${booking.status}. ${booking.patient.name} — ${booking.doctor.name} (${booking.doctor.specialty}) at ${booking.hospital}, ${booking.city} on ${booking.slot.label} (${booking.slot.mode}). Fee ₹${booking.fee}.`,
             };
         }
-        return {
-            found: true,
-            ...booking,
-            summary: `Booking ${booking.bookingId} is ${booking.status}. ${booking.patient.name} — ${booking.doctor.name} (${booking.doctor.specialty}) at ${booking.hospital}, ${booking.city} on ${booking.slot.label} (${booking.slot.mode}). Fee ₹${booking.fee}.`,
-        };
+        catch (error) {
+            ctx.logger.error('get-appointment failed', { error: error.message });
+            return { error: true, message: `Get appointment failed: ${error.message}` };
+        }
     }
 };
 __decorate([

@@ -8,6 +8,11 @@ import {
 import { DoctorModel } from './schemas/doctor.schema.js';
 import { SlotModel } from './schemas/slot.schema.js';
 import { AppointmentModel } from './schemas/appointment.schema.js';
+import { ReminderModel } from './schemas/reminder.schema.js';
+import { PatientPreferenceModel } from './schemas/patient-preference.schema.js';
+import { BedModel } from './schemas/bed.schema.js';
+import { MedicineModel } from './schemas/medicine.schema.js';
+import { LabTestModel } from './schemas/lab-test.schema.js';
 import { SEED_DOCTORS, buildSeedSlots } from './seed-data.js';
 
 /**
@@ -141,5 +146,35 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
   async appointments(): Promise<typeof AppointmentModel> {
     await this.connect();
     return AppointmentModel;
+  }
+
+  /** Reminders collection */
+  async reminders(): Promise<typeof ReminderModel> {
+    await this.connect();
+    return ReminderModel;
+  }
+
+  /** Patient preferences collection */
+  async patientPreferences(): Promise<typeof PatientPreferenceModel> {
+    await this.connect();
+    return PatientPreferenceModel;
+  }
+
+  /** Beds collection */
+  async beds(): Promise<typeof BedModel> {
+    await this.connect();
+    return BedModel;
+  }
+
+  /** Medicines collection */
+  async medicines(): Promise<typeof MedicineModel> {
+    await this.connect();
+    return MedicineModel;
+  }
+
+  /** Lab tests collection */
+  async labTests(): Promise<typeof LabTestModel> {
+    await this.connect();
+    return LabTestModel;
   }
 }

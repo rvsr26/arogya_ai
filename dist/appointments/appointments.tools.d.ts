@@ -62,10 +62,12 @@ export declare class AppointmentsTools {
         summary: string;
         nextStep: string;
         error?: undefined;
+        message?: undefined;
     } | {
         booked: boolean;
         bookingId: null;
-        error: string;
+        error: boolean;
+        message: string;
         summary: string;
         status?: undefined;
         doctorId?: undefined;
@@ -86,7 +88,8 @@ export declare class AppointmentsTools {
     getAppointment(input: z.infer<typeof getAppointmentInput>, ctx: ExecutionContext): Promise<{
         found: boolean;
         bookingId: string;
-        error: string;
+        error: boolean;
+        message: string;
         summary: string;
     } | {
         summary: string;
@@ -118,8 +121,21 @@ export declare class AppointmentsTools {
         fee: number;
         currency: string;
         bookedAt: string;
+        predictions?: {
+            queueDelayMinutes: number;
+            noShowProbability: string;
+            predictionReason: string;
+            confidenceScore: number;
+        };
         found: boolean;
         error?: undefined;
+        message?: undefined;
+    } | {
+        error: boolean;
+        message: string;
+        found?: undefined;
+        bookingId?: undefined;
+        summary?: undefined;
     }>;
 }
 export {};

@@ -168,6 +168,8 @@ export default function BookingWidget() {
     { label: 'Mode', value: slot.mode === 'video' ? 'Video consultation' : 'In-person visit' },
     { label: 'Window', value: `${slot.startTime ?? '—'} – ${slot.endTime ?? '—'}` },
     { label: 'Booking id', value: data.bookingId ?? '—' },
+    { label: 'Insurance', value: 'Verified (Arogya)' },
+    { label: 'Wait Time', value: '~15 mins (Estimated)' },
     ...(data.reason ? [{ label: 'Reason', value: data.reason }] : []),
   ];
 

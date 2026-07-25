@@ -24,6 +24,9 @@ export interface DoctorCard {
   openSlotCount: number;
   /** Soonest open slot, e.g. "2026-07-28 09:30". */
   nextAvailable: string | null;
+  acceptsInsurance: boolean;
+  distance: number;
+  estimatedWaitingTime: number;
 }
 
 /** One open slot option in a comparison column. */
@@ -83,8 +86,12 @@ export class DiscoveryService {
     specialty?: string;
     city?: string;
     maxFee?: number;
+    minRating?: number;
+    acceptsInsurance?: boolean;
+    date?: string;
+    sortBy?: 'rating' | 'distance' | 'fee' | 'earliest';
     limit: number;
-  }): Promise<{ doctors: DoctorCard[]; matchedSpecialty: string | null; matchedCity: string | null }> {
+  }): Promise<{ doctors: DoctorCard[]; matchedSpecialty: string | null; matchedCity: string | null; recommendation?: string }> {
     const doctorModel = await this.db.doctors();
 
     const filter: Record<string, unknown> = {};
@@ -109,19 +116,59 @@ export class DiscoveryService {
       filter.consultationFee = { $lte: params.maxFee };
     }
 
+    if (typeof params.minRating === 'number') {
+      filter.rating = { $gte: params.minRating };
+    }
+
+    if (typeof params.acceptsInsurance === 'boolean') {
+      filter.acceptsInsurance = params.acceptsInsurance;
+    }
+
+    let sortQuery: Record<string, 1 | -1> = { rating: -1, experienceYears: -1 };
+    
+    if (params.sortBy === 'distance') {
+      sortQuery = { distance: 1 };
+    } else if (params.sortBy === 'fee') {
+      sortQuery = { consultationFee: 1 };
+    }
+
     const docs = await doctorModel
       .find(filter)
-      .sort({ rating: -1, experienceYears: -1 })
+      .sort(sortQuery)
       .limit(params.limit)
       .lean<DoctorEntity[]>()
       .exec();
 
-    const cards = await Promise.all(docs.map((doc) => this.toCard(doc)));
+    let cards = await Promise.all(docs.map((doc) => this.toCard(doc)));
+
+    // Filter by availability date if requested
+    if (params.date) {
+      cards = cards.filter((card) => card.nextAvailable?.startsWith(params.date!));
+    }
+
+    if (params.sortBy === 'earliest') {
+      cards.sort((a, b) => {
+        if (!a.nextAvailable) return 1;
+        if (!b.nextAvailable) return -1;
+        return a.nextAvailable.localeCompare(b.nextAvailable);
+      });
+    }
+
+    let recommendation = undefined;
+    if (cards.length > 0) {
+      const top = cards[0];
+      recommendation = `I recommend Dr. ${top.name} because:
+• Highly rated (${top.rating}★)
+• Consultation fee is ₹${top.consultationFee}
+• Only ${top.distance} km away
+• ${top.acceptsInsurance ? 'Accepts your insurance' : 'Does not accept insurance'}`;
+    }
 
     return {
       doctors: cards,
       matchedSpecialty: docs[0]?.specialty ?? null,
       matchedCity: docs[0]?.city ?? null,
+      recommendation,
     };
   }
 
@@ -153,6 +200,9 @@ export class DiscoveryService {
       reviewCount: doc.reviewCount,
       imageUrl: doc.imageUrl,
       bio: doc.bio ?? '',
+      acceptsInsurance: doc.acceptsInsurance ?? false,
+      distance: doc.distance ?? 0,
+      estimatedWaitingTime: doc.estimatedWaitingTime ?? 15,
       openSlotCount: open.length,
       nextAvailable: first ? `${first.date} ${first.startTime}` : null,
     };
@@ -167,7 +217,7 @@ export class DiscoveryService {
     doctorIds: string[];
     date: string;
     mode?: 'in-person' | 'video';
-  }): Promise<{ columns: SlotComparisonColumn[]; unknownDoctorIds: string[] }> {
+  }): Promise<{ columns: SlotComparisonColumn[]; unknownDoctorIds: string[]; recommendedSlot?: { doctorId: string; slotId: string } | null; recommendedReason?: string | null }> {
     const doctorModel = await this.db.doctors();
     const slotModel = await this.db.slots();
 
@@ -220,6 +270,21 @@ export class DiscoveryService {
       });
     }
 
-    return { columns, unknownDoctorIds };
+    let recommendedSlot = null;
+    let recommendedReason = null;
+    if (columns.length > 0) {
+      // Find doctor with highest rating and earliest availability
+      const bestCol = [...columns].sort((a, b) => {
+        if (a.rating !== b.rating) return b.rating - a.rating;
+        return (a.earliest ?? '23:59').localeCompare(b.earliest ?? '23:59');
+      })[0];
+      if (bestCol && bestCol.slots.length > 0) {
+        const slot = bestCol.slots[0];
+        recommendedSlot = { doctorId: bestCol.doctorId, slotId: slot.slotId };
+        recommendedReason = `I recommend ${bestCol.name} at ${slot.startTime} because they have the highest rating (${bestCol.rating}★) and the earliest availability.`;
+      }
+    }
+
+    return { columns, unknownDoctorIds, recommendedSlot, recommendedReason };
   }
 }

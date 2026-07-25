@@ -23,6 +23,25 @@ const searchDoctorsInput = z.object({
         .positive()
         .optional()
         .describe('Optional maximum consultation fee in INR.'),
+    minRating: z
+        .number()
+        .min(1)
+        .max(5)
+        .optional()
+        .describe('Optional minimum rating (1-5).'),
+    acceptsInsurance: z
+        .boolean()
+        .optional()
+        .describe('Whether the patient prefers a doctor who accepts insurance.'),
+    date: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be ISO format YYYY-MM-DD')
+        .optional()
+        .describe('Optional calendar date to check availability for.'),
+    sortBy: z
+        .enum(['rating', 'distance', 'fee', 'earliest'])
+        .optional()
+        .describe('How to sort the results.'),
     limit: z
         .number()
         .int()
@@ -60,29 +79,42 @@ let DiscoveryTools = class DiscoveryTools {
             specialty: input.specialty,
             city: input.city,
             maxFee: input.maxFee,
+            minRating: input.minRating,
+            acceptsInsurance: input.acceptsInsurance,
+            sortBy: input.sortBy,
+            date: input.date,
         });
-        const limit = input.limit ?? 10;
-        const { doctors } = await this.discovery.searchDoctors({
-            specialty: input.specialty,
-            city: input.city,
-            maxFee: input.maxFee,
-            limit,
-        });
-        return {
-            query: {
-                specialty: input.specialty ?? null,
-                city: input.city ?? null,
-                maxFee: input.maxFee ?? null,
-            },
-            count: doctors.length,
-            doctors,
-            summary: doctors.length === 0
-                ? `No doctors found${input.specialty ? ` for ${input.specialty}` : ''}${input.city ? ` in ${input.city}` : ''}. Try a different specialty or city.`
-                : `Found ${doctors.length} ${input.specialty ?? 'doctor'}${doctors.length === 1 ? '' : 's'}${input.city ? ` in ${input.city}` : ''}. Top match: ${doctors[0].name} at ${doctors[0].hospital} (₹${doctors[0].consultationFee}, ${doctors[0].rating}★).`,
-            nextStep: doctors.length > 0
-                ? 'Call compare-slots with two or more doctorId values and a date (YYYY-MM-DD) to see open consultation windows side by side.'
-                : 'Ask the patient for a different specialty or nearby city.',
-        };
+        try {
+            const { doctors, recommendation } = await this.discovery.searchDoctors({
+                specialty: input.specialty,
+                city: input.city,
+                maxFee: input.maxFee,
+                minRating: input.minRating,
+                acceptsInsurance: input.acceptsInsurance,
+                date: input.date,
+                sortBy: input.sortBy,
+                limit: input.limit ?? 10,
+            });
+            return {
+                query: {
+                    specialty: input.specialty ?? null,
+                    city: input.city ?? null,
+                },
+                count: doctors.length,
+                doctors,
+                recommendation,
+                summary: doctors.length === 0
+                    ? `No doctors found. Try a different specialty or city.`
+                    : `Found ${doctors.length} doctors. ${recommendation || ''}`,
+                nextStep: doctors.length > 0
+                    ? 'Call compare-slots with two or more doctorId values and a date (YYYY-MM-DD).'
+                    : 'Ask the patient for a different specialty or nearby city.',
+            };
+        }
+        catch (error) {
+            ctx.logger.error('search-doctors failed', { error: error.message });
+            return { error: true, message: `Search failed: ${error.message}` };
+        }
     }
     async compareSlots(input, ctx) {
         ctx.logger.info('compare-slots', {
@@ -90,32 +122,50 @@ let DiscoveryTools = class DiscoveryTools {
             date: input.date,
             mode: input.mode,
         });
-        const { columns, unknownDoctorIds } = await this.discovery.compareSlots({
-            doctorIds: input.doctorIds,
-            date: input.date,
-            mode: input.mode,
-        });
-        // Times that appear in EVERY column — the easiest thing for a patient to act on.
-        const commonTimes = columns.length > 1
-            ? columns
-                .map((column) => column.slots.map((slot) => slot.startTime))
-                .reduce((shared, times) => shared.filter((time) => times.includes(time)))
-            : (columns[0]?.slots.map((slot) => slot.startTime) ?? []);
-        const summaryLines = columns.map((column) => `${column.name} (${column.hospital}, ₹${column.consultationFee}): ${column.availableCount === 0
-            ? 'no open slots'
-            : `${column.availableCount} open — ${column.slots.map((slot) => slot.startTime).join(', ')}`}`);
+        try {
+            const { columns, unknownDoctorIds, recommendedSlot, recommendedReason } = await this.discovery.compareSlots({
+                doctorIds: input.doctorIds,
+                date: input.date,
+                mode: input.mode,
+            });
+            // Times that appear in EVERY column — the easiest thing for a patient to act on.
+            const commonTimes = columns.length > 1
+                ? columns
+                    .map((column) => column.slots.map((slot) => slot.startTime))
+                    .reduce((shared, times) => shared.filter((time) => times.includes(time)))
+                : (columns[0]?.slots.map((slot) => slot.startTime) ?? []);
+            const summaryLines = columns.map((column) => `${column.name} (${column.hospital}, ₹${column.consultationFee}): ${column.availableCount === 0
+                ? 'no open slots'
+                : `${column.availableCount} open — ${column.slots.map((slot) => slot.startTime).join(', ')}`}`);
+            return {
+                date: input.date,
+                mode: input.mode ?? 'any',
+                columns,
+                commonTimes,
+                unknownDoctorIds,
+                recommendedSlot,
+                recommendedReason,
+                summary: columns.length === 0
+                    ? `No matching doctors found for the supplied ids on ${input.date}.`
+                    : `Slot comparison for ${input.date}:\n${summaryLines.join('\n')}\n${recommendedReason || ''}`,
+                nextStep: 'Call book-appointment with the chosen doctorId and slot details.',
+            };
+        }
+        catch (error) {
+            ctx.logger.error('compare-slots failed', { error: error.message });
+            return { error: true, message: `Compare slots failed: ${error.message}` };
+        }
+    }
+    async doctorSummary(input, ctx) {
+        ctx.logger.info('doctor-summary invoked', { doctorId: input.doctorId });
+        const docs = await this.discovery.searchDoctors({ limit: 50 }); // Fetch all or specific via a new method.
+        const doc = docs.doctors.find(d => d.doctorId === input.doctorId);
+        if (!doc) {
+            return { error: true, message: 'Doctor not found.' };
+        }
         return {
-            date: input.date,
-            mode: input.mode ?? 'any',
-            columns,
-            commonTimes,
-            unknownDoctorIds,
-            summary: columns.length === 0
-                ? `No matching doctors found for the supplied ids on ${input.date}.`
-                : `Slot comparison for ${input.date}:\n${summaryLines.join('\n')}${commonTimes.length > 0
-                    ? `\nBoth available at: ${commonTimes.join(', ')}.`
-                    : ''}`,
-            nextStep: 'Call book-appointment with the chosen doctorId, the date, the slot start time (HH:mm) or slotId, and the patient name and phone number.',
+            doctorId: doc.doctorId,
+            summary: `**Dr. ${doc.name}**\n${doc.experienceYears} years experience\n${doc.specialty} at ${doc.hospital}\nSpeaks ${doc.languages?.join(', ')}\n\nBio: ${doc.bio}\n\nRating: ${doc.rating}★ (${doc.reviewCount} reviews)\nDistance: ${doc.distance} km\nConsultation Fee: ₹${doc.consultationFee}\nAccepts Insurance: ${doc.acceptsInsurance ? 'Yes' : 'No'}`,
         };
     }
 };
@@ -204,6 +254,22 @@ __decorate([
     __metadata("design:paramtypes", [void 0, Object]),
     __metadata("design:returntype", Promise)
 ], DiscoveryTools.prototype, "compareSlots", null);
+__decorate([
+    Tool({
+        name: 'doctor-summary',
+        title: 'AI Doctor Profile Summary',
+        description: 'Generate a comprehensive summary for a specific doctor, including experience, languages, specialty, hospital, and recommendations.',
+        inputSchema: z.object({ doctorId: z.string() }),
+        invocation: {
+            invoking: 'Generating doctor profile…',
+            invoked: 'Profile generated',
+        },
+        metadata: { category: 'discovery', tags: ['profile', 'summary'] },
+    }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], DiscoveryTools.prototype, "doctorSummary", null);
 DiscoveryTools = __decorate([
     Injectable({ deps: [DiscoveryService] }),
     __metadata("design:paramtypes", [DiscoveryService])

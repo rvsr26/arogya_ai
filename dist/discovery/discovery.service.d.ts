@@ -20,6 +20,9 @@ export interface DoctorCard {
     openSlotCount: number;
     /** Soonest open slot, e.g. "2026-07-28 09:30". */
     nextAvailable: string | null;
+    acceptsInsurance: boolean;
+    distance: number;
+    estimatedWaitingTime: number;
 }
 /** One open slot option in a comparison column. */
 export interface SlotOption {
@@ -69,11 +72,16 @@ export declare class DiscoveryService {
         specialty?: string;
         city?: string;
         maxFee?: number;
+        minRating?: number;
+        acceptsInsurance?: boolean;
+        date?: string;
+        sortBy?: 'rating' | 'distance' | 'fee' | 'earliest';
         limit: number;
     }): Promise<{
         doctors: DoctorCard[];
         matchedSpecialty: string | null;
         matchedCity: string | null;
+        recommendation?: string;
     }>;
     /** Attach live availability figures to a directory row. */
     private toCard;
@@ -89,6 +97,11 @@ export declare class DiscoveryService {
     }): Promise<{
         columns: SlotComparisonColumn[];
         unknownDoctorIds: string[];
+        recommendedSlot?: {
+            doctorId: string;
+            slotId: string;
+        } | null;
+        recommendedReason?: string | null;
     }>;
 }
 //# sourceMappingURL=discovery.service.d.ts.map

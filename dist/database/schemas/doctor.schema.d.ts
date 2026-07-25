@@ -30,6 +30,12 @@ export interface DoctorEntity {
     /** HTTPS portrait used by the doctors widget. */
     imageUrl: string;
     bio: string;
+    /** Whether the doctor accepts insurance */
+    acceptsInsurance: boolean;
+    /** Distance in km from the patient (or static for MVP) */
+    distance: number;
+    /** Estimated waiting time in minutes at the clinic */
+    estimatedWaitingTime: number;
 }
 export declare const DoctorModel: Model<DoctorEntity>;
 //# sourceMappingURL=doctor.schema.d.ts.map

@@ -2,6 +2,13 @@ import { McpApp, Module, ConfigModule } from '@nitrostack/core';
 import { DatabaseModule } from './database/database.module.js';
 import { DiscoveryModule } from './discovery/discovery.module.js';
 import { AppointmentsModule } from './appointments/appointments.module.js';
+import { CopilotModule } from './copilot/copilot.module.js';
+import { BedModule } from './hospital/bed.module.js';
+import { PharmacyModule } from './pharmacy/pharmacy.module.js';
+import { LaboratoryModule } from './laboratory/laboratory.module.js';
+import { OrchestratorModule } from './orchestrator/orchestrator.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
+import { IncidentModule } from './incident/incident.module.js';
 import { SystemHealthCheck } from './health/system.health.js';
 
 /**
@@ -31,6 +38,13 @@ import { SystemHealthCheck } from './health/system.health.js';
     DatabaseModule,
     DiscoveryModule,
     AppointmentsModule,
+    CopilotModule,
+    BedModule,
+    PharmacyModule,
+    LaboratoryModule,
+    OrchestratorModule,
+    AnalyticsModule,
+    IncidentModule,
   ],
   providers: [
     // Health Checks

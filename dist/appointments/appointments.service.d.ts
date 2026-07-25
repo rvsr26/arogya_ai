@@ -30,6 +30,12 @@ export interface BookingView {
     fee: number;
     currency: string;
     bookedAt: string;
+    predictions?: {
+        queueDelayMinutes: number;
+        noShowProbability: string;
+        predictionReason: string;
+        confidenceScore: number;
+    };
 }
 export declare class BookingError extends Error {
 }

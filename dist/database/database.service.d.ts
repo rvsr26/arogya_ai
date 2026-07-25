@@ -2,6 +2,11 @@ import { ConfigService, type OnModuleInit, type OnApplicationShutdown } from '@n
 import { DoctorModel } from './schemas/doctor.schema.js';
 import { SlotModel } from './schemas/slot.schema.js';
 import { AppointmentModel } from './schemas/appointment.schema.js';
+import { ReminderModel } from './schemas/reminder.schema.js';
+import { PatientPreferenceModel } from './schemas/patient-preference.schema.js';
+import { BedModel } from './schemas/bed.schema.js';
+import { MedicineModel } from './schemas/medicine.schema.js';
+import { LabTestModel } from './schemas/lab-test.schema.js';
 /**
  * Owns the single Mongoose connection for the whole MCP server and guarantees
  * demo data exists before any tool runs.
@@ -42,5 +47,15 @@ export declare class DatabaseService implements OnModuleInit, OnApplicationShutd
     slots(): Promise<typeof SlotModel>;
     /** Appointment ledger collection (connection guaranteed). */
     appointments(): Promise<typeof AppointmentModel>;
+    /** Reminders collection */
+    reminders(): Promise<typeof ReminderModel>;
+    /** Patient preferences collection */
+    patientPreferences(): Promise<typeof PatientPreferenceModel>;
+    /** Beds collection */
+    beds(): Promise<typeof BedModel>;
+    /** Medicines collection */
+    medicines(): Promise<typeof MedicineModel>;
+    /** Lab tests collection */
+    labTests(): Promise<typeof LabTestModel>;
 }
 //# sourceMappingURL=database.service.d.ts.map

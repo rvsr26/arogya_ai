@@ -29,6 +29,9 @@ interface DoctorCard {
   bio: string;
   openSlotCount: number;
   nextAvailable: string | null;
+  acceptsInsurance: boolean;
+  distance: number;
+  estimatedWaitingTime: number;
 }
 
 interface SearchDoctorsOutput {
@@ -369,6 +372,28 @@ export default function DoctorsWidget() {
                     •
                   </span>
                   <span>{Number(doctor.reviewCount ?? 0).toLocaleString('en-IN')} reviews</span>
+                  <span aria-hidden style={{ opacity: 0.5 }}>
+                    •
+                  </span>
+                  <span>{doctor.distance ?? 0} km away</span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 4,
+                    fontSize: 11,
+                    color: doctor.acceptsInsurance ? '#17a34a' : 'inherit',
+                    opacity: doctor.acceptsInsurance ? 0.9 : 0.6,
+                  }}
+                >
+                  <span>{doctor.acceptsInsurance ? '✓ Accepts Insurance' : '✗ No Insurance'}</span>
+                  <span aria-hidden style={{ opacity: 0.5 }}>
+                    •
+                  </span>
+                  <span>{doctor.estimatedWaitingTime ?? 15} min wait</span>
                 </div>
 
                 {languages.length > 0 ? (

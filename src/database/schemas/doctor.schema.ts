@@ -31,6 +31,12 @@ export interface DoctorEntity {
   /** HTTPS portrait used by the doctors widget. */
   imageUrl: string;
   bio: string;
+  /** Whether the doctor accepts insurance */
+  acceptsInsurance: boolean;
+  /** Distance in km from the patient (or static for MVP) */
+  distance: number;
+  /** Estimated waiting time in minutes at the clinic */
+  estimatedWaitingTime: number;
 }
 
 const doctorSchema = new Schema<DoctorEntity>(
@@ -52,6 +58,9 @@ const doctorSchema = new Schema<DoctorEntity>(
     reviewCount: { type: Number, required: true },
     imageUrl: { type: String, required: true },
     bio: { type: String, default: '' },
+    acceptsInsurance: { type: Boolean, default: false },
+    distance: { type: Number, default: 0 },
+    estimatedWaitingTime: { type: Number, default: 15 },
   },
   { collection: 'doctors', versionKey: false },
 );

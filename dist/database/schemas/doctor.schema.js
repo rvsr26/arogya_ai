@@ -17,6 +17,9 @@ const doctorSchema = new Schema({
     reviewCount: { type: Number, required: true },
     imageUrl: { type: String, required: true },
     bio: { type: String, default: '' },
+    acceptsInsurance: { type: Boolean, default: false },
+    distance: { type: Number, default: 0 },
+    estimatedWaitingTime: { type: Number, default: 15 },
 }, { collection: 'doctors', versionKey: false });
 export const DoctorModel = mongoose.models.Doctor ??
     mongoose.model('Doctor', doctorSchema);
