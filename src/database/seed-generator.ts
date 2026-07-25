@@ -147,7 +147,7 @@ export function generateAppointments(slots: SlotEntity[], count: number): Appoin
     const slot = bookedSlots[i];
     appointments.push({
       bookingId: slot.bookingId as string,
-      status: faker.helpers.arrayElement(['confirmed', 'completed', 'cancelled']) as AppointmentStatus,
+      status: faker.helpers.arrayElement(['Confirmed', 'Completed', 'Cancelled']) as AppointmentStatus,
       doctorId: slot.doctorId,
       doctorName: `Dr. ${faker.person.lastName()}`, // Simplified for speed
       doctorSpecialty: 'Specialist',
@@ -165,6 +165,7 @@ export function generateAppointments(slots: SlotEntity[], count: number): Appoin
       patientName: `${faker.person.firstName()} ${faker.person.lastName()}`,
       patientPhone: faker.phone.number({ style: 'national' }),
       createdAt: faker.date.recent({ days: 30 }),
+      history: [{ status: 'Confirmed', timestamp: new Date() }],
     });
   }
   return appointments;
@@ -188,10 +189,12 @@ export function generateBeds(count: number): BedEntity[] {
 export function generateMedicines(count: number): MedicineEntity[] {
   const medicines: MedicineEntity[] = [];
   for (let i = 0; i < count; i++) {
+    const stock = faker.number.int({ min: 0, max: 5000 });
     medicines.push({
       medicineId: `med_${i}`,
       name: `${faker.science.chemicalElement().name} ${faker.number.int({ min: 10, max: 1000 })}mg`,
-      stock: faker.number.int({ min: 0, max: 5000 }),
+      stock,
+      stockLevel: Math.min(100, Math.round((stock / 5000) * 100)), // Normalized 0-100
       expiryDate: faker.date.future({ years: 2 }),
       availability: faker.datatype.boolean(0.9),
       alternativeMedicines: [],

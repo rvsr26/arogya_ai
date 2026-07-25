@@ -1,7 +1,13 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type { ConsultationMode } from './slot.schema.js';
 
-export type AppointmentStatus = 'confirmed' | 'cancelled' | 'completed';
+export type AppointmentStatus = 'Scheduled' | 'Confirmed' | 'Checked In' | 'Completed' | 'Cancelled' | 'Rescheduled' | 'Missed';
+
+export interface AppointmentHistoryEntry {
+  status: AppointmentStatus;
+  timestamp: Date;
+  note?: string;
+}
 
 /**
  * A booked consultation. Denormalises the doctor/hospital snapshot at booking
@@ -30,15 +36,28 @@ export interface AppointmentEntity {
   fee: number;
   currency: string;
   createdAt: Date;
+  history: AppointmentHistoryEntry[];
+  cancelledAt?: Date | null;
+  cancelReason?: string | null;
+  slotReleased?: boolean;
 }
+
+const appointmentHistorySchema = new Schema<AppointmentHistoryEntry>(
+  {
+    status: { type: String, required: true },
+    timestamp: { type: Date, default: () => new Date() },
+    note: { type: String },
+  },
+  { _id: false }
+);
 
 const appointmentSchema = new Schema<AppointmentEntity>(
   {
     bookingId: { type: String, required: true, unique: true, index: true },
     status: {
       type: String,
-      enum: ['confirmed', 'cancelled', 'completed'],
-      default: 'confirmed',
+      enum: ['Scheduled', 'Confirmed', 'Checked In', 'Completed', 'Cancelled', 'Rescheduled', 'Missed'],
+      default: 'Confirmed',
     },
     doctorId: { type: String, required: true, index: true },
     doctorName: { type: String, required: true },
@@ -59,6 +78,10 @@ const appointmentSchema = new Schema<AppointmentEntity>(
     fee: { type: Number, required: true },
     currency: { type: String, default: 'INR' },
     createdAt: { type: Date, default: () => new Date() },
+    history: { type: [appointmentHistorySchema], default: [] },
+    cancelledAt: { type: Date, default: null },
+    cancelReason: { type: String, default: null },
+    slotReleased: { type: Boolean, default: false },
   },
   { collection: 'appointments', versionKey: false },
 );

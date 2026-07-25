@@ -267,16 +267,41 @@ export class DiscoveryTools {
   })
   async doctorSummary(input: { doctorId: string }, ctx: ExecutionContext) {
     ctx.logger.info('doctor-summary invoked', { doctorId: input.doctorId });
-    const docs = await this.discovery.searchDoctors({ limit: 50 }); // Fetch all or specific via a new method.
-    const doc = docs.doctors.find(d => d.doctorId === input.doctorId);
     
+    // H1 fix: Direct O(1) DB lookup instead of scanning 50 results
+    const doctorModel = await this.discovery['db'].doctors();
+    const doc = await doctorModel.findOne({ doctorId: input.doctorId }).lean().exec();
+
     if (!doc) {
-      return { error: true, message: 'Doctor not found.' };
+      return { error: true, message: `Doctor with id "${input.doctorId}" not found. Use search-doctors to find a valid doctorId.` };
     }
+
+    const slotModel = await this.discovery['db'].slots();
+    const openSlots = await slotModel.countDocuments({ doctorId: input.doctorId, status: 'available' });
+    const nextSlot = await slotModel.findOne({ doctorId: input.doctorId, status: 'available' }).sort({ date: 1, startTime: 1 }).lean().exec();
 
     return {
       doctorId: doc.doctorId,
-      summary: `**Dr. ${doc.name}**\n${doc.experienceYears} years experience\n${doc.specialty} at ${doc.hospital}\nSpeaks ${doc.languages?.join(', ')}\n\nBio: ${doc.bio}\n\nRating: ${doc.rating}★ (${doc.reviewCount} reviews)\nDistance: ${doc.distance} km\nConsultation Fee: ₹${doc.consultationFee}\nAccepts Insurance: ${doc.acceptsInsurance ? 'Yes' : 'No'}`,
+      name: doc.name,
+      specialty: doc.specialty,
+      hospital: doc.hospital,
+      city: doc.city,
+      qualifications: doc.qualifications,
+      experienceYears: doc.experienceYears,
+      languages: doc.languages,
+      rating: doc.rating,
+      reviewCount: doc.reviewCount,
+      consultationFee: doc.consultationFee,
+      currency: doc.currency,
+      acceptsInsurance: doc.acceptsInsurance,
+      bio: doc.bio,
+      imageUrl: doc.imageUrl,
+      availability: {
+        openSlots,
+        nextAvailable: nextSlot ? `${nextSlot.date} ${nextSlot.startTime}` : null,
+      },
+      recommendation: `I recommend Dr. ${doc.name} because:\n• ${doc.experienceYears} years of experience\n• Rated ${doc.rating}★ (${doc.reviewCount} reviews)\n• Consultation fee ₹${doc.consultationFee}\n• ${doc.acceptsInsurance ? 'Accepts insurance' : 'No insurance accepted'}\n• ${openSlots} slots currently available`,
+      summary: `**Dr. ${doc.name}** — ${doc.specialty} at ${doc.hospital}, ${doc.city}. ${doc.experienceYears} years experience. Rated ${doc.rating}★. Fee ₹${doc.consultationFee}. ${openSlots} open slots.`,
     };
   }
 }

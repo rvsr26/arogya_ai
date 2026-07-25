@@ -49,6 +49,12 @@ interface GetAppointmentOutput {
   bookedAt?: string;
   error?: string;
   summary?: string;
+  predictions?: {
+    queueDelayMinutes: number;
+    noShowProbability: string;
+    predictionReason: string;
+    confidenceScore: number;
+  };
 }
 
 const accent = '#0f8b8d';
@@ -58,6 +64,8 @@ const scopedCss = `
 @keyframes arogya-spin { to { transform: rotate(360deg); } }
 @keyframes arogya-pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .arogya-confirm { animation: arogya-pop .28s ease both; }
+.arogya-action-btn:hover { background: rgba(15,139,141,0.1); border-color: rgba(15,139,141,0.5); }
+.arogya-action-btn-danger:hover { background: rgba(214,69,69,0.1); border-color: rgba(214,69,69,0.5); color: #d64545; }
 `;
 
 export default function BookingWidget() {
@@ -144,7 +152,7 @@ export default function BookingWidget() {
             gap: 10,
             padding: '34px 20px',
             borderRadius: 16,
-            border: `1px dashed ${isDark ? 'rgba(234,247,248,.16)' : 'rgba(13,43,44,.16)'}`,
+            border: \`1px dashed \${isDark ? 'rgba(234,247,248,.16)' : 'rgba(13,43,44,.16)'}\`,
             textAlign: 'center',
           }}
         >
@@ -160,23 +168,43 @@ export default function BookingWidget() {
   }
 
   const patient = data.patient;
-  const status = (data.status ?? 'confirmed').toLowerCase();
-  const statusTone =
-    status === 'cancelled' ? '#d64545' : status === 'completed' ? '#5b6c6d' : '#17a34a';
+  const status = (data.status ?? 'Confirmed').toLowerCase();
+  
+  let statusTone = '#17a34a'; // Confirmed/Scheduled/CheckedIn
+  if (status === 'cancelled' || status === 'missed') statusTone = '#d64545';
+  if (status === 'completed') statusTone = '#5b6c6d';
+  if (status === 'rescheduled') statusTone = '#eab308';
+  
   const divider = isDark ? 'rgba(234,247,248,.09)' : 'rgba(13,43,44,.08)';
   const showDetails = state?.showDetails !== false;
 
-  const rows: Array<{ label: string; value: string }> = [
-    { label: 'Patient', value: patient?.name ?? '—' },
-    { label: 'Phone', value: patient?.phone ?? '—' },
-    ...(typeof patient?.age === 'number' ? [{ label: 'Age', value: `${patient.age} yrs` }] : []),
-    { label: 'Mode', value: slot.mode === 'video' ? 'Video consultation' : 'In-person visit' },
-    { label: 'Window', value: `${slot.startTime ?? '—'} – ${slot.endTime ?? '—'}` },
-    { label: 'Booking id', value: data.bookingId ?? '—' },
-    { label: 'Insurance', value: 'Verified (Arogya)' },
-    { label: 'Wait Time', value: '~15 mins (Estimated)' },
-    ...(data.reason ? [{ label: 'Reason', value: data.reason }] : []),
-  ];
+  const rows: Array<{ label: string; value: string }> = [];
+  
+  // Hide fake placeholders for patient information
+  if (patient?.name && patient.name.trim() !== '') {
+    rows.push({ label: 'Patient', value: patient.name });
+  }
+  if (patient?.phone && patient.phone.trim() !== '') {
+    rows.push({ label: 'Phone', value: patient.phone });
+  }
+  if (typeof patient?.age === 'number') {
+    rows.push({ label: 'Age', value: \`\${patient.age} yrs\` });
+  }
+  
+  rows.push({ label: 'Mode', value: slot.mode === 'video' ? 'Video consultation' : 'In-person visit' });
+  rows.push({ label: 'Window', value: \`\${slot.startTime ?? '—'} – \${slot.endTime ?? '—'}\` });
+  rows.push({ label: 'Booking id', value: data.bookingId ?? '—' });
+  
+  if (data.predictions) {
+    rows.push({ label: 'Estimated Queue Delay', value: \`~\${data.predictions.queueDelayMinutes} mins\` });
+  }
+
+  if (data.reason) {
+    rows.push({ label: 'Reason', value: data.reason });
+  }
+  
+  rows.push({ label: 'Reminders', value: '24h, 2h, 30m before' });
+  rows.push({ label: 'Cancellation Policy', value: 'Free cancellation up to 2 hours before.' });
 
   return (
     <div style={shell}>
@@ -190,7 +218,7 @@ export default function BookingWidget() {
           borderRadius: 18,
           overflow: 'hidden',
           background: isDark ? '#111d20' : '#ffffff',
-          border: `1px solid ${isDark ? 'rgba(234,247,248,.09)' : 'rgba(13,43,44,.09)'}`,
+          border: \`1px solid \${isDark ? 'rgba(234,247,248,.09)' : 'rgba(13,43,44,.09)'}\`,
           boxShadow: isDark
             ? '0 12px 34px -22px rgba(0,0,0,.95)'
             : '0 1px 2px rgba(13,43,44,.04), 0 14px 34px -22px rgba(13,43,44,.35)',
@@ -203,8 +231,8 @@ export default function BookingWidget() {
             alignItems: 'center',
             gap: 8,
             padding: '11px 16px',
-            background: isDark ? 'rgba(23,163,74,.12)' : 'rgba(23,163,74,.09)',
-            borderBottom: `1px solid ${divider}`,
+            background: isDark ? \`\${statusTone}20\` : \`\${statusTone}15\`,
+            borderBottom: \`1px solid \${divider}\`,
           }}
         >
           <span
@@ -214,7 +242,7 @@ export default function BookingWidget() {
               height: 7,
               borderRadius: '50%',
               background: statusTone,
-              boxShadow: `0 0 0 3px ${statusTone}26`,
+              boxShadow: \`0 0 0 3px \${statusTone}30\`,
             }}
           />
           <span
@@ -294,8 +322,8 @@ export default function BookingWidget() {
             >
               {doctor.specialty ?? 'Consultation'}
             </p>
-            <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.45, opacity: 0.78 }}>
-              {data.hospital ?? '—'}
+            <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.45, opacity: 0.78, display: 'flex', alignItems: 'center', gap: 4 }}>
+              🏥 {data.hospital ?? '—'}
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 11, lineHeight: 1.45, opacity: 0.55 }}>
               {data.address ?? data.city ?? ''}
@@ -310,7 +338,7 @@ export default function BookingWidget() {
             padding: '14px 16px',
             borderRadius: 14,
             background: isDark ? 'rgba(194,254,255,.07)' : 'rgba(15,139,141,.07)',
-            border: `1px solid ${isDark ? 'rgba(194,254,255,.14)' : 'rgba(15,139,141,.16)'}`,
+            border: \`1px solid \${isDark ? 'rgba(194,254,255,.14)' : 'rgba(15,139,141,.16)'}\`,
           }}
         >
           <p
@@ -334,9 +362,28 @@ export default function BookingWidget() {
               lineHeight: 1.25,
             }}
           >
-            {slot.label ?? (`${slot.date ?? ''} ${slot.startTime ?? ''}`.trim() || '—')}
+            {slot.label ?? (\`\${slot.date ?? ''} \${slot.startTime ?? ''}\`.trim() || '—')}
           </p>
         </div>
+
+        {/* Video Link */}
+        {slot.mode === 'video' && status !== 'cancelled' && (
+          <div style={{ margin: '14px 16px 0', padding: '12px 16px', borderRadius: 10, background: isDark ? '#1a2b2c' : '#f0f9f9', border: \`1px solid \${divider}\` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>🎥 Demo Meeting Link</span>
+              <a href={\`https://demo.arogyaai.ai/meeting/\${data.bookingId?.split('_')[1] || 'ABCD'}\`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: accent, textDecoration: 'none', padding: '4px 8px', border: \`1px solid \${accent}50\`, borderRadius: 6, fontWeight: 600 }}>Join</a>
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: 10, opacity: 0.6 }}>This is a simulated demo meeting room.</p>
+          </div>
+        )}
+
+        {/* Prediction Insights */}
+        {data.predictions && showDetails && (
+          <div style={{ margin: '14px 16px 0', padding: '12px 16px', borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>💡 AI Queue Prediction ({data.predictions.confidenceScore}% Confidence)</p>
+            <p style={{ margin: '4px 0 0', fontSize: 10.5, opacity: 0.7, lineHeight: 1.4 }}>{data.predictions.predictionReason}</p>
+          </div>
+        )}
 
         {/* Detail rows */}
         {showDetails ? (
@@ -350,7 +397,7 @@ export default function BookingWidget() {
                   justifyContent: 'space-between',
                   gap: 14,
                   padding: '7px 0',
-                  borderBottom: `1px solid ${divider}`,
+                  borderBottom: \`1px solid \${divider}\`,
                 }}
               >
                 <span style={{ fontSize: 11.5, opacity: 0.58, flexShrink: 0 }}>{row.label}</span>
@@ -369,42 +416,60 @@ export default function BookingWidget() {
           </div>
         ) : null}
 
-        {/* Fee + toggle */}
+        {/* Fee + Action Buttons */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
+            flexDirection: 'column',
+            gap: 16,
             padding: '14px 16px 16px',
           }}
         >
-          <div>
-            <span style={{ fontSize: 10.5, opacity: 0.55, display: 'block' }}>
-              Consultation fee
-            </span>
-            <span style={{ fontSize: 19, fontWeight: 720, letterSpacing: '-0.025em' }}>
-              {money(data.fee ?? 0, data.currency ?? 'INR')}
-            </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: 10.5, opacity: 0.55, display: 'block' }}>Consultation fee</span>
+              <span style={{ fontSize: 19, fontWeight: 720, letterSpacing: '-0.025em' }}>
+                {money(data.fee ?? 0, data.currency ?? 'INR')}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setState({ showDetails: !showDetails })}
+              style={{
+                padding: '8px 13px',
+                borderRadius: 10,
+                fontFamily: 'inherit',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: isDark ? accentSoft : accent,
+                background: 'transparent',
+                border: \`1px solid \${isDark ? 'rgba(194,254,255,.28)' : 'rgba(15,139,141,.3)'}\`,
+              }}
+            >
+              {showDetails ? 'Hide details' : 'Show details'}
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setState({ showDetails: !showDetails })}
-            style={{
-              padding: '8px 13px',
-              borderRadius: 10,
-              fontFamily: 'inherit',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              color: isDark ? accentSoft : accent,
-              background: 'transparent',
-              border: `1px solid ${isDark ? 'rgba(194,254,255,.28)' : 'rgba(15,139,141,.3)'}`,
-            }}
-          >
-            {showDetails ? 'Hide details' : 'Show details'}
-          </button>
+          {/* Action Buttons */}
+          {status !== 'cancelled' && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <div className="arogya-action-btn" style={{ flex: 1, padding: 8, textAlign: 'center', fontSize: 11, fontWeight: 600, borderRadius: 8, border: \`1px solid \${divider}\`, cursor: 'pointer', transition: 'all 0.2s' }}>
+                Add to Calendar
+              </div>
+              {slot.mode === 'in-person' && (
+                <div className="arogya-action-btn" style={{ flex: 1, padding: 8, textAlign: 'center', fontSize: 11, fontWeight: 600, borderRadius: 8, border: \`1px solid \${divider}\`, cursor: 'pointer', transition: 'all 0.2s' }}>
+                  Google Maps
+                </div>
+              )}
+              <div className="arogya-action-btn" style={{ flex: 1, padding: 8, textAlign: 'center', fontSize: 11, fontWeight: 600, borderRadius: 8, border: \`1px solid \${divider}\`, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => alert("Tell the AI Assistant: 'Please reschedule my appointment'")}>
+                Reschedule
+              </div>
+              <div className="arogya-action-btn-danger" style={{ flex: 1, padding: 8, textAlign: 'center', fontSize: 11, fontWeight: 600, borderRadius: 8, border: \`1px solid \${divider}\`, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => alert("Tell the AI Assistant: 'Please cancel my appointment'")}>
+                Cancel
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -418,14 +483,13 @@ export default function BookingWidget() {
           opacity: 0.5,
         }}
       >
-        Please arrive 15 minutes early and carry a valid photo ID.
-        {data.bookedAt ? ` Booked ${bookedAtLabel(data.bookedAt)}.` : ''}
+        This is a demo booking confirmation. In a production deployment, the hospital would send the consultation link or visit instructions.
+        {data.bookedAt ? \` Booked \${bookedAtLabel(data.bookedAt)}.\` : ''}
       </p>
     </div>
   );
 }
 
-/** Two-letter monogram fallback when a portrait is missing. */
 function monogram(name: string): string {
   const parts = (name ?? '')
     .replace(/^dr\.?\s*/i, '')
@@ -438,13 +502,11 @@ function monogram(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/** 900 + INR → "₹900" */
 function money(amount: number, currency: string): string {
-  const symbol = currency === 'INR' ? '₹' : `${currency} `;
-  return `${symbol}${Math.round(Number(amount) || 0).toLocaleString('en-IN')}`;
+  const symbol = currency === 'INR' ? '₹' : \`\${currency} \`;
+  return \`\${symbol}\${Math.round(Number(amount) || 0).toLocaleString('en-IN')}\`;
 }
 
-/** ISO timestamp → "28 Jul 2026, 10:42" (UTC, stable across renders). */
 function bookedAtLabel(iso: string): string {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return '';

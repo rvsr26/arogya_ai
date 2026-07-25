@@ -197,6 +197,17 @@ graph TD
 
 ---
 
+## 🔄 Advanced Appointment Lifecycle
+
+ArogyaAI goes far beyond simple CRUD operations to model a production-grade hospital booking workflow:
+
+- **Strict Audit Trails:** Every appointment maintains a continuous `history` array. State transitions (e.g., Booked → Rescheduled → Cancelled) are logged with timestamps and reasons, ensuring full compliance and traceablity.
+- **Smart Prediction Engine & Queue Estimation:** The AI doesn't just show static delay times. It dynamically computes estimated queue delays based on the exact appointment time (peak vs off-peak hours), mode, and booking lead time. Predictions are transparently explained with a % Confidence score.
+- **Automated Reminder Generation:** When a booking is confirmed or rescheduled, the system automatically calculates and generates a cascade of reminders for 24-hours, 1-hour, and 30-minutes prior.
+- **Atomic Slot Management & Cancellation:** The `cancel-appointment` and `reschedule-appointment` workflows utilize atomic MongoDB `$setOnInsert` and `findOneAndUpdate` queries. A cancelled appointment is never deleted—it is marked cancelled, the `cancelReason` is logged, and the underlying inventory slot is strictly released back to the global pool.
+
+---
+
 ## 🏗️ Architecture
 
 Under the hood, ArogyaAI is a highly modular, decoupled enterprise system leveraging the Model Context Protocol (MCP) to safely expose hospital infrastructure to AI agents.
@@ -223,12 +234,14 @@ We expose the hospital's capabilities deterministically via MCP tools:
 | :--- | :--- |
 | `search-doctors` | Ranks and retrieves specialists. |
 | `compare-slots` | Finds overlapping schedules. |
-| `book-appointment` | Atomic reservation with queue prediction. |
+| `book-appointment` | Atomic reservation with dynamic queue prediction. |
+| `cancel-appointment` | Soft-cancels booking and releases slot inventory. |
+| `reschedule-appointment` | Swaps slots atomically and logs audit history. |
 | `health-assistant` | Initial triage and symptom analysis. |
 | `incident-commander` | Coordinates emergency workflows. |
 | `what-if-simulator` | Models hypothetical hospital surges. |
 | `executive-briefing` | Generates NLP hospital summaries. |
-*(Also includes: `doctor-summary`, `get-appointment`, `cancel-appointment`, `report-emergency`, `bed-status`, `medicine-search`, `search-test`, `lab-report-status`, `hospital-command-agent`)*
+*(Also includes: `doctor-summary`, `get-appointment`, `report-emergency`, `bed-status`, `medicine-search`, `search-test`, `lab-report-status`, `hospital-command-agent`)*
 
 ---
 

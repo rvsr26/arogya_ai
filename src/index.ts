@@ -1,12 +1,12 @@
 /**
- * Calculator MCP Server
- * 
- * Main entry point for the MCP server.
- * Uses the @McpApp decorator pattern for clean, NestJS-style architecture.
- * 
- * Transport Configuration:
- * - Development (NODE_ENV=development): STDIO only
- * - Production (NODE_ENV=production): Dual transport (STDIO + HTTP SSE)
+ * ArogyaAI OS — MCP Server Entry Point
+ *
+ * Bootstraps the NitroStack application that exposes the full hospital
+ * intelligence platform over the Model Context Protocol (MCP).
+ *
+ * Transport:
+ * - Development (NODE_ENV=development): STDIO
+ * - Production (NODE_ENV=production):  STDIO + HTTP SSE
  */
 
 import 'dotenv/config';
