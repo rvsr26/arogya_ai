@@ -14,6 +14,7 @@ import { BedModel } from './schemas/bed.schema.js';
 import { MedicineModel } from './schemas/medicine.schema.js';
 import { LabTestModel } from './schemas/lab-test.schema.js';
 import { SEED_DOCTORS, buildSeedSlots } from './seed-data.js';
+import { generateDoctors, generateBeds, generateMedicines, generateLabTests } from './seed-generator.js';
 
 /**
  * Owns the single Mongoose connection for the whole MCP server and guarantees
@@ -99,7 +100,8 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
    * never silently frees an already booked slot.
    */
   private async ensureSeeded(): Promise<void> {
-    const doctorOps = SEED_DOCTORS.map((doctor) => ({
+    const allDoctors = [...SEED_DOCTORS, ...generateDoctors(100)];
+    const doctorOps = allDoctors.map((doctor) => ({
       updateOne: {
         filter: { doctorId: doctor.doctorId },
         update: { $set: doctor },
@@ -128,6 +130,21 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
     if (slotOps.length > 0) {
       await SlotModel.bulkWrite(slotOps, { ordered: false });
     }
+
+    const bedOps = generateBeds(150).map((bed) => ({
+      updateOne: { filter: { bedId: bed.bedId }, update: { $set: bed }, upsert: true }
+    }));
+    if (bedOps.length > 0) await BedModel.bulkWrite(bedOps, { ordered: false });
+
+    const medOps = generateMedicines(500).map((med) => ({
+      updateOne: { filter: { medicineId: med.medicineId }, update: { $set: med }, upsert: true }
+    }));
+    if (medOps.length > 0) await MedicineModel.bulkWrite(medOps, { ordered: false });
+
+    const labOps = generateLabTests().map((lab) => ({
+      updateOne: { filter: { testId: lab.testId }, update: { $set: lab }, upsert: true }
+    }));
+    if (labOps.length > 0) await LabTestModel.bulkWrite(labOps, { ordered: false });
   }
 
   /** Doctor directory collection (connection guaranteed). */

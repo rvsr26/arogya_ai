@@ -23,19 +23,22 @@ export class IncidentTools {
       incidentId: `INC-${Date.now()}`,
       condition: input.condition,
       severity: input.severity,
+      triage: input.severity === 'Critical' ? 'Level 1 - Resuscitation' : 'Level 2 - Emergent',
+      suggestedDepartment: input.condition.toLowerCase().includes('heart') || input.condition.toLowerCase().includes('chest') ? 'Cardiology ICU' : 'Trauma ER',
       timeline: [
         { time: new Date().toISOString(), agent: 'EmergencyAgent', action: 'Incident declared', status: 'Complete' },
-        { time: new Date().toISOString(), agent: 'BedAgent', action: 'Reserve ICU bed', status: 'Reserved (Bed #42)' },
+        { time: new Date().toISOString(), agent: 'BedAgent', action: 'Reserve ICU bed', status: 'Demo Simulation: ICU Bed #42 Reserved' },
         { time: new Date().toISOString(), agent: 'DoctorAgent', action: 'Locate nearest specialist', status: 'Found (Dr. Sharma)' },
       ],
       predictionReason: `Based on severity "${input.severity}", aggressive ICU reservation is required.`,
       confidenceScore: 99,
       decisionPath: [
         'Analyze condition severity',
-        'Check ICU capacity',
+        'Check ICU capacity (Demo)',
         'Trigger specialist paging',
       ],
-      summary: `Emergency protocol executed for ${input.condition}. ICU reserved and specialist notified.`,
+      escalationPath: 'If specialist unresponsive in 2 mins, page backup on-call doctor.',
+      summary: `🚨 DEMO SIMULATION: Emergency protocol executed for ${input.condition}. ICU reserved and specialist notified.`,
     };
   }
 }

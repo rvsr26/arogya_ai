@@ -65,6 +65,13 @@ const doctorSchema = new Schema<DoctorEntity>(
   { collection: 'doctors', versionKey: false },
 );
 
+doctorSchema.index({
+  name: 'text',
+  specialty: 'text',
+  hospital: 'text',
+  specialtyAliases: 'text',
+});
+
 export const DoctorModel: Model<DoctorEntity> =
   (mongoose.models.Doctor as Model<DoctorEntity> | undefined) ??
   mongoose.model<DoctorEntity>('Doctor', doctorSchema);

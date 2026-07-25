@@ -150,11 +150,11 @@ export class DiscoveryTools {
         doctors,
         recommendation,
         summary: doctors.length === 0
-          ? `No doctors found. Try a different specialty or city.`
+          ? `This demo currently contains providers primarily in major hubs like Pune, Mumbai, Bangalore, and Delhi. No doctors found exactly matching the criteria.`
           : `Found ${doctors.length} doctors. ${recommendation || ''}`,
         nextStep: doctors.length > 0
           ? 'Call compare-slots with two or more doctorId values and a date (YYYY-MM-DD).'
-          : 'Ask the patient for a different specialty or nearby city.',
+          : 'Suggest nearest major cities, offer teleconsultation, or offer emergency guidance. Do not end the conversation.',
       };
     } catch (error: any) {
       ctx.logger.error('search-doctors failed', { error: error.message });

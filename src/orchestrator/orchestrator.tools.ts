@@ -49,17 +49,42 @@ export class OrchestratorTools {
   async simulateScenario(input: z.infer<typeof whatIfInput>, ctx: ExecutionContext) {
     ctx.logger.info('what-if-simulator invoked', input);
 
+    const lowerScenario = input.scenario.toLowerCase();
+    
+    let waitingTime = '+45 mins';
+    let queue = 'High';
+    let util = '100% (Critical)';
+    let reason = 'Simulated surge exceeds current staffing ratios.';
+    let alts = ['Route non-critical patients to nearby clinics', 'Call in off-duty doctors'];
+    let summary = `Simulation for "${input.scenario}" complete. Expect severe bottlenecks. Recommend calling off-duty staff.`;
+
+    if (lowerScenario.includes('dengue')) {
+      waitingTime = '+120 mins (Lab overload)';
+      queue = 'Extreme in Pathology';
+      util = '80% (Ward Beds)';
+      reason = 'Sudden spike in CBC and platelet count tests.';
+      alts = ['Deploy mobile testing units', 'Fast-track fever clinic'];
+      summary = `Simulation for "${input.scenario}" complete. Severe lab bottlenecks predicted. Deploy fast-track fever clinic.`;
+    } else if (lowerScenario.includes('flood') || lowerScenario.includes('casualty') || lowerScenario.includes('earthquake')) {
+      waitingTime = '+200 mins (Trauma overload)';
+      queue = 'Catastrophic in ER';
+      util = '150% (ICU Overflow)';
+      reason = 'Mass trauma event overrides standard triage capabilities.';
+      alts = ['Activate mass casualty protocol', 'Convert general wards to triage', 'Request ambulance diversions'];
+      summary = `🚨 DISASTER SIMULATION for "${input.scenario}". ER will collapse within 45 mins. Activate mass casualty protocol immediately.`;
+    }
+
     return {
       scenario: input.scenario,
       predictions: {
-        waitingTimeIncrease: '+45 mins',
-        queueGrowth: 'High',
-        icuUtilization: '100% (Critical)',
+        waitingTimeIncrease: waitingTime,
+        queueGrowth: queue,
+        icuUtilization: util,
       },
-      predictionReason: 'Simulated surge exceeds current staffing ratios.',
+      predictionReason: reason,
       confidenceScore: 85,
-      alternatives: ['Route non-critical patients to nearby clinics', 'Call in off-duty doctors'],
-      summary: `Simulation for "${input.scenario}" complete. Expect severe ICU bottlenecks. Recommend calling off-duty staff.`,
+      alternatives: alts,
+      summary: summary,
     };
   }
 }

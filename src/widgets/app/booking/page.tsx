@@ -78,8 +78,13 @@ export default function BookingWidget() {
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     WebkitFontSmoothing: 'antialiased',
     background: isDark
-      ? 'linear-gradient(180deg, #08181a 0%, #0b1214 45%)'
-      : 'linear-gradient(180deg, #f4feff 0%, #ffffff 42%)',
+      ? 'rgba(11, 18, 20, 0.65)'
+      : 'rgba(255, 255, 255, 0.75)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
     color: isDark ? '#eaf7f8' : '#0d2b2c',
     ...(maxHeight ? { maxHeight, overflowY: 'auto' as const } : {}),
   };

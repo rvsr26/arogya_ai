@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ToolDecorator as Tool, Widget, ExecutionContext } from '@nitrostack/core';
+import { ToolDecorator as Tool, ResourceDecorator as Resource, PromptDecorator as Prompt, Widget, ExecutionContext } from '@nitrostack/core';
 
 const healthAssistantInput = z.object({
   symptoms: z.string().describe('The symptoms described by the patient.'),
@@ -26,26 +26,35 @@ export class CopilotTools {
 
     const lowerSymptoms = input.symptoms.toLowerCase();
     let specialty = 'General Physician';
-    let questions = ['How long have you been experiencing this?'];
+    let questions = [
+      'Could you tell me your age and gender?',
+      'How long have you been experiencing this?',
+      'How severe is it on a scale of 1-10?',
+      'Do you have any existing medical conditions (like diabetes or high blood pressure)?',
+      'Are you currently on any medication or have any allergies?',
+    ];
 
     if (lowerSymptoms.includes('chest pain') || lowerSymptoms.includes('heart')) {
       specialty = 'Cardiologist';
-      questions = ['Is the pain spreading to your arm or jaw?', 'Any breathing difficulty?'];
+      questions.push('Is the pain spreading to your arm, neck, or jaw?');
+      questions.push('Are you experiencing any shortness of breath or sweating?');
     } else if (lowerSymptoms.includes('skin') || lowerSymptoms.includes('rash')) {
       specialty = 'Dermatologist';
-      questions = ['Is the rash itchy?', 'Have you tried any creams?'];
+      questions.push('Is the rash itchy or spreading?');
+      questions.push('Have you tried any creams or treatments yet?');
     } else if (lowerSymptoms.includes('bone') || lowerSymptoms.includes('joint')) {
       specialty = 'Orthopaedic Surgeon';
-      questions = ['Did you have a recent fall or injury?', 'Is there any swelling?'];
+      questions.push('Did you have a recent fall or physical injury?');
+      questions.push('Is there any visible swelling or redness?');
     }
 
     return {
       symptoms: input.symptoms,
       recommendedSpecialty: specialty,
       followUpQuestions: questions,
-      disclaimer: "This is not a medical diagnosis. Please consult a registered medical practitioner.",
-      summary: `I've analyzed your symptoms. Based on this, a ${specialty} is recommended. Next step: Ask the patient the follow-up questions or offer to search for a ${specialty}.`,
-      nextStep: 'Offer to call search-doctors for the recommended specialty.',
+      disclaimer: "⚠️ **Disclaimer**: This is a demo simulation and not a medical diagnosis. Please consult a registered medical practitioner.",
+      summary: `I've analyzed your symptoms. Based on this, a ${specialty} is recommended. Next step: Ask the patient the follow-up questions to gather more clinical context.`,
+      nextStep: 'Offer to call search-doctors for the recommended specialty after gathering basic triage info.',
     };
   }
 
@@ -73,6 +82,34 @@ export class CopilotTools {
       emergencyNumber: '102 / 108',
       action: 'Do NOT continue normal appointment booking until the user confirms they are safe.',
       summary: `EMERGENCY PROTOCOL TRIGGERED for "${input.emergencyType}". User must confirm they are safe before proceeding.`,
+    };
+  }
+
+  @Resource({
+    uri: 'hospital://guidelines/triage',
+    name: 'Hospital Triage Guidelines',
+    description: 'Standard operating procedures for emergency triage and leveling.',
+    mimeType: 'text/plain',
+  })
+  async getTriageGuidelines(ctx: ExecutionContext) {
+    return 'Level 1: Resuscitation (Immediate). Level 2: Emergent (15 mins). Level 3: Urgent (30 mins).';
+  }
+
+  @Prompt({
+    name: 'triage_assistant',
+    description: 'System prompt template for initializing a specialized medical triage assistant.',
+    arguments: [
+      { name: 'specialty', description: 'The required medical specialty focus', required: true }
+    ],
+  })
+  async getTriagePrompt(args: { specialty: string }, ctx: ExecutionContext) {
+    return {
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert ${args.specialty} triage assistant. Evaluate symptoms carefully, ask follow-up questions regarding age, duration, and severity. Do not diagnose.`
+        }
+      ]
     };
   }
 }
