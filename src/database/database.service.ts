@@ -14,7 +14,8 @@ import { BedModel } from './schemas/bed.schema.js';
 import { MedicineModel } from './schemas/medicine.schema.js';
 import { LabTestModel } from './schemas/lab-test.schema.js';
 import { SEED_DOCTORS, buildSeedSlots } from './seed-data.js';
-import { generateDoctors, generateBeds, generateMedicines, generateLabTests } from './seed-generator.js';
+import { generateDoctors, generateBeds, generateMedicines, generateLabTests, generateSlots, generateAppointments, generatePatients, generateReminders, generateIncidents } from './seed-generator.js';
+import { IncidentModel } from './schemas/incident.schema.js';
 
 /**
  * Owns the single Mongoose connection for the whole MCP server and guarantees
@@ -100,51 +101,74 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
    * never silently frees an already booked slot.
    */
   private async ensureSeeded(): Promise<void> {
-    const allDoctors = [...SEED_DOCTORS, ...generateDoctors(100)];
-    const doctorOps = allDoctors.map((doctor) => ({
-      updateOne: {
-        filter: { doctorId: doctor.doctorId },
-        update: { $set: doctor },
-        upsert: true,
-      },
-    }));
-
-    if (doctorOps.length > 0) {
-      await DoctorModel.bulkWrite(doctorOps, { ordered: false });
+    const docCount = await DoctorModel.countDocuments();
+    if (docCount >= 1000) {
+      console.error('[Seeding] Database already heavily populated. Skipping massive generation to save boot time.');
+      return;
     }
 
-    const slotOps = buildSeedSlots().map((slot) => {
-      const { status, bookingId, ...stable } = slot;
-      return {
-        updateOne: {
-          filter: { slotId: slot.slotId },
-          update: {
-            $set: stable,
-            $setOnInsert: { status, bookingId: bookingId ?? null },
-          },
-          upsert: true,
-        },
-      };
-    });
+    console.error('[Seeding] Generating massive Faker dataset...');
+    const allDoctors = generateDoctors(1200);
+    const slots = generateSlots(allDoctors, 10000);
+    const beds = generateBeds(1000);
+    const meds = generateMedicines(1000);
+    const labs = generateLabTests(500);
+    const patients = generatePatients(1000);
+    const appointments = generateAppointments(slots, 5000);
+    const reminders = generateReminders(1000);
+    const incidents = generateIncidents(500);
 
-    if (slotOps.length > 0) {
-      await SlotModel.bulkWrite(slotOps, { ordered: false });
-    }
+    const chunkArray = <T>(arr: T[], size: number): T[][] =>
+      Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size));
 
-    const bedOps = generateBeds(150).map((bed) => ({
-      updateOne: { filter: { bedId: bed.bedId }, update: { $set: bed }, upsert: true }
-    }));
-    if (bedOps.length > 0) await BedModel.bulkWrite(bedOps, { ordered: false });
+    const upsertChunks = async <T, R>(items: T[], getOp: (item: T) => any, model: mongoose.Model<R>) => {
+      const chunks = chunkArray(items, 2000);
+      for (const chunk of chunks) {
+        const ops = chunk.map(getOp);
+        if (ops.length > 0) await model.bulkWrite(ops, { ordered: false });
+      }
+    };
 
-    const medOps = generateMedicines(500).map((med) => ({
-      updateOne: { filter: { medicineId: med.medicineId }, update: { $set: med }, upsert: true }
-    }));
-    if (medOps.length > 0) await MedicineModel.bulkWrite(medOps, { ordered: false });
+    console.error('[Seeding] Inserting Doctors...');
+    await upsertChunks(allDoctors, (d) => ({ updateOne: { filter: { doctorId: d.doctorId }, update: { $set: d }, upsert: true } }), DoctorModel);
 
-    const labOps = generateLabTests().map((lab) => ({
-      updateOne: { filter: { testId: lab.testId }, update: { $set: lab }, upsert: true }
-    }));
-    if (labOps.length > 0) await LabTestModel.bulkWrite(labOps, { ordered: false });
+    console.error('[Seeding] Inserting Slots...');
+    await upsertChunks(slots, (s) => ({
+      updateOne: { filter: { slotId: s.slotId }, update: { $set: s }, upsert: true }
+    }), SlotModel);
+
+    console.error('[Seeding] Inserting Beds...');
+    await upsertChunks(beds, (b) => ({ updateOne: { filter: { bedId: b.bedId }, update: { $set: b }, upsert: true } }), BedModel);
+
+    console.error('[Seeding] Inserting Medicines...');
+    await upsertChunks(meds, (m) => ({ updateOne: { filter: { medicineId: m.medicineId }, update: { $set: m }, upsert: true } }), MedicineModel);
+
+    console.error('[Seeding] Inserting Lab Tests...');
+    await upsertChunks(labs, (l) => ({ updateOne: { filter: { testId: l.testId }, update: { $set: l }, upsert: true } }), LabTestModel);
+
+    console.error('[Seeding] Inserting Patients...');
+    await upsertChunks(patients, (p) => ({ updateOne: { filter: { patientId: p.patientId }, update: { $set: p }, upsert: true } }), PatientPreferenceModel);
+
+    console.error('[Seeding] Inserting Appointments...');
+    await upsertChunks(appointments, (a) => ({ updateOne: { filter: { bookingId: a.bookingId }, update: { $set: a }, upsert: true } }), AppointmentModel);
+
+    console.error('[Seeding] Inserting Reminders...');
+    await upsertChunks(reminders, (r) => ({ updateOne: { filter: { reminderId: r.reminderId }, update: { $set: r }, upsert: true } }), ReminderModel);
+
+    console.error('[Seeding] Inserting Incidents...');
+    await upsertChunks(incidents, (i) => ({ updateOne: { filter: { incidentId: i.incidentId }, update: { $set: i }, upsert: true } }), IncidentModel);
+
+    console.error(`[Seeding] Complete! Final Counts:
+      Doctors: ${await DoctorModel.countDocuments()}
+      Medicines: ${await MedicineModel.countDocuments()}
+      Beds: ${await BedModel.countDocuments()}
+      Slots: ${await SlotModel.countDocuments()}
+      Lab Tests: ${await LabTestModel.countDocuments()}
+      Appointments: ${await AppointmentModel.countDocuments()}
+      Patients: ${await PatientPreferenceModel.countDocuments()}
+      Incidents: ${await IncidentModel.countDocuments()}
+      Reminders: ${await ReminderModel.countDocuments()}
+    `);
   }
 
   /** Doctor directory collection (connection guaranteed). */
