@@ -208,20 +208,219 @@ ArogyaAI goes far beyond simple CRUD operations to model a production-grade hosp
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
 
-Under the hood, ArogyaAI is a highly modular, decoupled enterprise system leveraging the Model Context Protocol (MCP) to safely expose hospital infrastructure to AI agents.
+Under the hood, ArogyaAI OS is a highly modular, MCP-native enterprise system. Every capability is exposed as a deterministic, typed MCP Tool — the AI never generates hospital data from training memory; it always queries real systems.
+
+### Diagram 1 — High-Level Platform Architecture
 
 ```mermaid
-graph TD
-    User --> NextJS[Next.js Frontend]
-    NextJS --> Orchestrator[Multi-Agent Orchestrator]
-    Orchestrator --> Appointments[Appointments Module]
-    Orchestrator --> Incident[Incident Module]
-    Orchestrator --> Analytics[Analytics Module]
-    Appointments --> MongoDB[(MongoDB)]
-    Incident --> MongoDB
-    Analytics --> MongoDB
+graph TB
+    subgraph Client["🖥️ Client Layer"]
+        U((👤 User))
+        AI["🤖 AI Model\n(Claude / GPT / Gemini)"]
+    end
+
+    subgraph MCP["⚙️ NitroStack MCP Server"]
+        direction TB
+        TOOLS["🔧 15 MCP Tools"]
+        WIDGETS["🎨 3 Generative UI Widgets\n(Next.js 14)"]
+        RESOURCES["📄 2 MCP Resources\n(Triage Guidelines, Disclaimer)"]
+        PROMPTS["💬 2 MCP Prompts\n(triage_assistant, booking_assistant)"]
+    end
+
+    subgraph MODULES["🏥 10 Specialist Agent Modules"]
+        direction LR
+        DISC["🔍 Discovery\nsearch-doctors\ncompare-slots\ndoctor-summary"]
+        APPT["📅 Appointments\nbook · cancel\nreschedule · get"]
+        COPILOT["🩺 Copilot\nhealth-assistant\nreport-emergency"]
+        BED["🛏️ Hospital\nbed-status"]
+        PHARM["💊 Pharmacy\nmedicine-search"]
+        LAB["🧪 Laboratory\nsearch-test\nlab-report-status"]
+        ANALYTICS["📊 Analytics\nexecutive-briefing"]
+        INCIDENT["🚨 Incident\nincident-commander"]
+        ORCH["🎯 Orchestrator\nhospital-command-agent\nwhat-if-simulator"]
+        HEALTH["❤️ Health\nsystem-check"]
+    end
+
+    subgraph DB["🗄️ MongoDB — 'health' Database"]
+        direction LR
+        COL1["doctors\n2,015 records"]
+        COL2["slots\n11,710 records"]
+        COL3["appointments\n5,006 records"]
+        COL4["beds\n1,000 records"]
+        COL5["medicines\n1,000 records"]
+        COL6["lab_tests\n500 records"]
+        COL7["reminders\n1,016 records"]
+        COL8["incidents\n500 records"]
+        COL9["patient_preferences\n1,000 records"]
+    end
+
+    U -->|Natural Language| AI
+    AI <-->|MCP Protocol| TOOLS
+    TOOLS --> MODULES
+    MODULES --> DB
+    TOOLS --> WIDGETS
+    AI -->|Renders| WIDGETS
+```
+
+---
+
+### Diagram 2 — MCP Tool Flow (Patient Journey)
+
+```mermaid
+sequenceDiagram
+    actor Patient
+    participant AI as 🤖 AI Model
+    participant HA as health-assistant
+    participant SD as search-doctors
+    participant CS as compare-slots
+    participant BA as book-appointment
+    participant GA as get-appointment
+    participant DB as MongoDB
+
+    Patient->>AI: "I have chest pain, age 65"
+    AI->>HA: symptoms="chest pain", age=65, severity=9
+    HA-->>AI: specialty=Cardiologist, risk=Critical, isEmergency=true
+
+    AI->>SD: specialty="Cardiologist", city="Bangalore", minRating=4.5
+    SD->>DB: find doctors + count available slots
+    DB-->>SD: 5 matching doctors with live slot counts
+    SD-->>AI: DoctorCard[] + AI recommendation
+    AI-->>Patient: 🎨 Renders doctors widget
+
+    AI->>CS: doctorIds=["doc_1","doc_2"], date="2026-07-28"
+    CS->>DB: find available slots for both doctors
+    DB-->>CS: side-by-side slot columns
+    CS-->>AI: SlotComparisonColumn[] + recommended slot
+
+    Patient->>AI: "Book Dr. X at 5 PM for Ananya Sharma"
+    AI->>BA: doctorId, slotId, patientName, patientPhone
+    BA->>DB: findOneAndUpdate({status:'available'}) ATOMIC
+    DB-->>BA: slot reserved
+    BA->>DB: create appointment + 3 reminders
+    BA-->>AI: bookingId + BookingView
+
+    AI->>GA: bookingId="booking_abc123"
+    GA->>DB: find appointment
+    DB-->>GA: AppointmentEntity
+    GA-->>AI: BookingView + predictions
+    AI-->>Patient: 🎨 Renders booking confirmation widget
+```
+
+---
+
+### Diagram 3 — Appointment Lifecycle State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Available : Slot created in inventory
+
+    Available --> Confirmed : book-appointment\n(atomic findOneAndUpdate)
+    note right of Confirmed : bookingId generated\n3 reminders auto-created\nhistory[0] = Confirmed
+
+    Confirmed --> Rescheduled : reschedule-appointment\n(same bookingId preserved)
+    note right of Rescheduled : old slot → Available\nnew slot → Booked\nreminders recalculated\nhistory appended
+
+    Confirmed --> Cancelled : cancel-appointment\n(+ cancel reason)
+    Rescheduled --> Cancelled : cancel-appointment
+
+    note right of Cancelled : slot → Available\nreminders cancelled\ncancelledAt + cancelReason stored\nslotReleased = true
+
+    Confirmed --> CheckedIn : Patient arrives [future]
+    CheckedIn --> Completed : Consultation done [future]
+    Confirmed --> Missed : No-show [future]
+
+    Cancelled --> [*]
+    Completed --> [*]
+    Missed --> [*]
+```
+
+---
+
+### Diagram 4 — Database Schema & Relationships
+
+```mermaid
+erDiagram
+    DOCTORS {
+        string doctorId PK
+        string name
+        string specialty
+        string specialtySlug
+        string[] specialtyAliases
+        string city
+        string hospital
+        number consultationFee
+        number rating
+        boolean acceptsInsurance
+    }
+
+    SLOTS {
+        string slotId PK
+        string doctorId FK
+        string date
+        string startTime
+        string endTime
+        string mode
+        string status
+        number fee
+        string bookingId FK
+    }
+
+    APPOINTMENTS {
+        string bookingId PK
+        string status
+        string doctorId FK
+        string slotId FK
+        string patientName
+        string patientPhone
+        object[] history
+        string cancelReason
+        boolean slotReleased
+    }
+
+    REMINDERS {
+        string reminderId PK
+        string bookingId FK
+        string type
+        date scheduledAt
+        string status
+    }
+
+    BEDS {
+        string bedId PK
+        string hospital
+        string type
+        string status
+    }
+
+    MEDICINES {
+        string medicineId PK
+        string name
+        number stock
+        number stockLevel
+        boolean availability
+    }
+
+    LAB_TESTS {
+        string testId PK
+        string name
+        number price
+        string reportStatus
+        string collectionStatus
+    }
+
+    INCIDENTS {
+        string incidentId PK
+        string condition
+        string severity
+        string status
+        string department
+    }
+
+    DOCTORS ||--o{ SLOTS : "has many"
+    SLOTS ||--o| APPOINTMENTS : "reserved by"
+    APPOINTMENTS ||--o{ REMINDERS : "generates"
 ```
 
 ---
